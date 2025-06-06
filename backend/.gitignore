@@ -1,0 +1,43 @@
+# Node modules
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Optional: ignore build/output folders
+dist/
+build/
+
+# IDE settings
+.vscode/
+.idea/
+
+# Coverage reports
+coverage/
+
+# PM2 logs
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Local databases or data
+*.sqlite
+*.db
+
+# Optional: Mac/Linux system files
+*.swp
+*~
