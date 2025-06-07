@@ -17,7 +17,7 @@ yarn-error.log*
 
 # OS-generated files
 .DS_Store
-Thumbs.db
+Thumbs.dbx
 
 # Optional: ignore build/output folders
 dist/
