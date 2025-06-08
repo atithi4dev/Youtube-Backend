@@ -1,10 +1,3 @@
-// id string pk
-//   subscriber ObjectId users
-//   channel ObjectId users
-//   createdAt Date
-//   updatedAt Date
-
-
 import mongoose, { Schema } from "mongoose";
 
 const subscriptionSchema = new Schema({
