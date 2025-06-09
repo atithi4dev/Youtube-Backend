@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import morganMiddleware from "./logger/indexLog.js";
+import { errorHandler } from "./middlewares/error.middlewares.js";
+
 const app = express();
 app.use(morganMiddleware()); 
 app.use(
@@ -18,10 +20,12 @@ app.use(express.static('public'));
 
 // Importing routes
 import healthCheckRouter from "./routes/healthCheck.routes.js";
-
+import userRouter from "./routes/user.routes.js";
 
 // Routes
 app.use("/api/v1/healthcheck", healthCheckRouter);
+app.use("/api/v1/users", userRouter);
 
+app.use(errorHandler)
 
 export {app};
