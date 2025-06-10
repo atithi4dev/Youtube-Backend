@@ -15,7 +15,6 @@ const registerUser = asyncHandler(async (req, res) => {
   const { userName, email, fullName, password } = req.body;
 
   // Validation
-  const requiredFields = ["fullName", "userName", "email", "password"];
   ["fullName", "userName", "email", "password"].forEach((field) => {
     if (!req.body[field]?.trim()) {
       throw new ApiError(400, `All fields are required.`);
@@ -33,7 +32,6 @@ const registerUser = asyncHandler(async (req, res) => {
   // Upload Avatar and Cover Image on Cloudinary
 
   const avatarLocalPath = req.files?.avatar?.[0]?.path;
-  console.log("Avatar Local Path:", avatarLocalPath);
   const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
 
   let avatar;
