@@ -46,6 +46,12 @@ const userSchema = new Schema(
     refreshToken: {
       type: String,
     },
+    imageDetails: [
+      {
+        name: { type: String, required: true },
+        publicId: { type: String, required: true },
+      },
+    ],
   },
   {
     timestamps: true,
@@ -66,7 +72,7 @@ userSchema.methods.isPasswordCorrect = async function (password) {
 userSchema.methods.generateAccessToken = async function () {
   return jwt.sign(
     {
-      __id: this._id,
+      _id: this._id,
       email: this.email,
       userName: this.userName,
       fullName: this.fullName,
@@ -81,7 +87,7 @@ userSchema.methods.generateAccessToken = async function () {
 userSchema.methods.generateRefreshToken = async function () {
   return jwt.sign(
     {
-      __id: this._id
+      _id: this._id,
     },
     process.env.REFRESH_TOKEN_SECRET,
     {
