@@ -1,6 +1,5 @@
 import mongoose, { isValidObjectId } from "mongoose";
-import { Video } from "../models/video.models.js";
-import { User } from "../models/user.models.js";
+import Video from "../models/video.models.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -10,15 +9,16 @@ import {
   uploadOnCloudinary,
   deleteFromCloudinary,
 } from "../utils/Cloudinary.js";
+import fs from "fs";
 
 const getAllPublishedVideos = asyncHandler(async (req, res) => {
   let { page = 1, limit = 10, query, userId } = req.query;
-  const { sortBy = "createdAt", sortType = "desc" } = req.query;
+  let { sortBy = "createdAt", sortType = "desc" } = req.query;
 
-  const allowedSortTypes = ["asc", "desc"];
-  const allowedSortByFields = ["createdat", "duration"];
+  let allowedSortTypes = ["asc", "desc"];
+  let allowedSortByFields = ["createdat", "duration"];
 
-  if (!userId || !isValidObjectId(userId)) {
+  if (userId && !isValidObjectId(userId)) {
     throw new ApiError(400, "User ID is required and must be a valid ObjectId");
   }
 
@@ -29,12 +29,15 @@ const getAllPublishedVideos = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Page and limit are required");
   }
 
-  const matchStage = {
+  let matchStage = {
     isPublished: true,
   };
+  if(userId) {
+    matchStage.owner = new mongoose.Types.ObjectId(userId);
+  }
 
   if (query) {
-    const queryWords = query.split(" ");
+    let queryWords = query.split(" ");
     matchStage.$or = await queryWords.flatMap((word) => [
       { title: { $regex: query, $options: "i" } },
       { description: { $regex: query, $options: "i" } },
@@ -50,7 +53,104 @@ const getAllPublishedVideos = asyncHandler(async (req, res) => {
     );
   }
 
-  const sortOrder = sortType === "asc" ? 1 : -1;
+  let sortOrder = sortType === "asc" ? 1 : -1;
+
+  sortBy = sortBy.toLowerCase();
+
+  if (!allowedSortByFields.includes(sortBy)) {
+    throw new ApiError(
+      400,
+      `Sort by must be one of ${allowedSortByFields.join(", ")}`
+    );
+  }
+
+  if (sortBy === "createdat") {
+    sortBy = "createdAt";
+  }
+
+  const pipeline = [
+    { $match: matchStage },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+      },
+    },
+    {
+      $unwind: "$owner",
+    },
+    {
+      $project: {
+        _id: 1,
+        title: 1,
+        thumbnail: 1,
+        duration: 1,
+        views: 1,
+        isPublished: 1,
+        createdAt: 1,
+        "owner._id": 1,
+        "owner.userName": 1,
+        "owner.profilePicture": 1,
+      },
+    },
+  ];
+
+  const options = {
+    page: page || 1,
+    limit: limit || 30,
+    sort: { [sortBy]: sortOrder },
+  };
+
+  const aggregate = Video.aggregate(pipeline);
+  const result = await Video.aggregatePaginate(aggregate, options);
+  if (page > result.totalPages) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, null, "Requested page exceeds total pages."));
+  }
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, result, "Videos fetched successfully"));
+});
+
+const getAllOwnVideos = asyncHandler(async (req, res) => {
+  let { page = 1, limit = 10, query } = req.query;
+  let { sortBy = "createdAt", sortType = "desc" } = req.query;
+
+  let allowedSortTypes = ["asc", "desc"];
+  let allowedSortByFields = ["createdat", "duration"];
+
+  page = parseInt(page);
+  limit = parseInt(limit);
+
+  if (!page || !limit) {
+    throw new ApiError(400, "Page and limit are required");
+  }
+
+  let matchStage = {};
+  matchStage.owner = req.user._id;
+
+  if (query) {
+    const queryWords = query.split("+");
+    matchStage.$or = await queryWords.flatMap((word) => [
+      { title: { $regex: query, $options: "i" } },
+      { description: { $regex: query, $options: "i" } },
+    ]);
+  }
+
+  sortType = sortType.toLowerCase();
+
+  if (!allowedSortTypes.includes(sortType)) {
+    throw new ApiError(
+      400,
+      `Sort type must be one of ${allowedSortTypes.join(", ")}`
+    );
+  }
+
+  let sortOrder = sortType === "asc" ? 1 : -1;
 
   sortBy = sortBy.toLowerCase();
 
@@ -106,114 +206,6 @@ const getAllPublishedVideos = asyncHandler(async (req, res) => {
   res
     .status(200)
     .json(new ApiResponse(200, result, "Videos fetched successfully"));
-});
-
-const getAllVideos = asyncHandler(async (req, res) => {
-  let { page = 1, limit = 10, query, userId } = req.query;
-  const { sortBy = "createdAt", sortType = "desc" } = req.query;
-
-  const allowedSortTypes = ["asc", "desc"];
-  const allowedSortByFields = ["createdat", "duration"];
-
-  if (!userId || !isValidObjectId(userId)) {
-    throw new ApiError(400, "User ID is required and must be a valid ObjectId");
-  }
-
-  if (userId !== req.user._id.toString()) {
-    throw new ApiError(
-      403,
-      "You are not authorized to view this user's videos"
-    );
-  }
-
-  page = parseInt(page);
-  limit = parseInt(limit);
-
-  if (!page || !limit) {
-    throw new ApiError(400, "Page and limit are required");
-  }
-
-  const matchStage = {};
-
-  if (query) {
-    const queryWords = query.split(" ");
-    matchStage.$or = await queryWords.flatMap((word) => [
-      { title: { $regex: query, $options: "i" } },
-      { description: { $regex: query, $options: "i" } },
-    ]);
-  }
-
-  sortType = sortType.toLowerCase();
-
-  if (!allowedSortTypes.includes(sortType)) {
-    throw new ApiError(
-      400,
-      `Sort type must be one of ${allowedSortTypes.join(", ")}`
-    );
-  }
-
-  const sortOrder = sortType === "asc" ? 1 : -1;
-
-  sortBy = sortBy.toLowerCase();
-
-  if (!allowedSortByFields.includes(sortBy)) {
-    throw new ApiError(
-      400,
-      `Sort by must be one of ${allowedSortByFields.join(", ")}`
-    );
-  }
-
-  if (sortBy === "createdat") {
-    sortBy = "createdAt";
-  }
-
-  const pipeline = [
-    { $match: matchStage },
-    {
-      $lookup: {
-        from: "users",
-        localField: "owner",
-        foreignField: "_id",
-        as: "owner",
-      },
-    },
-    {
-      $unwind: "$owner",
-    },
-    {
-      $project: {
-        _id: 1,
-        title: 1,
-        thumbnail: 1,
-        duration: 1,
-        views: 1,
-        isPublished: 1,
-        createdAt: 1,
-        "owner._id": 1,
-        "owner.userName": 1,
-        "owner.profilePicture": 1,
-      },
-    },
-  ];
-
-  const options = {
-    page: page || 1,
-    limit: limit || 30,
-    sort: { [sortBy]: sortOrder },
-  };
-
-  const aggregate = Video.aggregate(pipeline);
-  const result = await Video.aggregatePaginate(aggregate, options);
-
-  res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        result,
-        "Videos fetched successfully"
-      )
-    );
 });
 
 const publishAVideo = asyncHandler(async (req, res) => {
@@ -316,8 +308,6 @@ const updateVideo = asyncHandler(async (req, res) => {
 
   const { title, description } = req.body;
 
-  const thumbnailLocalPath = req.file.path;
-
   if (!videoId || !isValidObjectId(videoId)) {
     throw new ApiError(
       400,
@@ -338,14 +328,19 @@ const updateVideo = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video not found");
   }
 
+  if (video?.owner.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "You are not authorized to update this video");
+  }
+
   try {
     if (title) video.title = title;
 
     if (description) video.description = description;
 
     if (req.file) {
+      const thumbnailLocalPath = req.file.path;
       const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
-
+      deleteFromCloudinary(video.publicId.thumbnail);
       if (!thumbnail) {
         fs.unlinkSync(thumbnailLocalPath);
         throw new ApiError(500, "Thumbnail upload failed");
@@ -381,7 +376,10 @@ const deleteVideo = asyncHandler(async (req, res) => {
   if (!video) {
     throw new ApiError(404, "Video not found");
   }
-
+  if(video.owner.toString() !== req.user._id.toString()) {
+    res.status(403).json( new ApiResponse(403, null, "You are not authorized to delete this video"));
+  }
+  
   try {
     if (video?.publicId?.video)
       await deleteVideoFromCloudinary(video?.publicId?.video);
@@ -412,6 +410,14 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
   }
 
   const video = await Video.findById(videoId);
+  if(!video) {
+    throw new ApiError(404, "Video not found");
+  }
+  if(video.owner.toString() !== req.user._id.toString()) {
+    res.status(403).json(
+      new ApiResponse(403, null, "You are not authorized to toggle publish status of this video")
+    );
+  }
   video.isPublished = !video.isPublished;
   await video.save();
   return res
@@ -425,6 +431,7 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     );
 });
 
+
 export {
   getAllPublishedVideos,
   publishAVideo,
@@ -432,5 +439,5 @@ export {
   updateVideo,
   deleteVideo,
   togglePublishStatus,
-  getAllVideos,
+  getAllOwnVideos,
 };

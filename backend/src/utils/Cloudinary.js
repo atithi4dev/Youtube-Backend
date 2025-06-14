@@ -29,9 +29,8 @@ const uploadOnCloudinary = async (localFilePath) => {
 
 const uploadVideoOnCloudinary = async (localFilePath) => {
   try {
-    const response = await cloudinary.uploader.upload_large(localFilePath, {
+    const response = await cloudinary.uploader.upload(localFilePath, {
       resource_type: "video",
-      chunk_size: 6 * 1024 * 1024,
       folder: "videos",
     });
     fs.unlinkSync(localFilePath);
