@@ -8,11 +8,11 @@ import {
     removeVideoFromPlaylist,
     updatePlaylist,
 } from "../controllers/playlist.conrollers.js"
-import {verifyJWT} from "../middlewares/auth.middleware.js"
+import {verifyJwt} from "../middlewares/auth.middlewares.js"
 
 const router = Router();
 
-router.use(verifyJWT);
+router.use(verifyJwt);
 
 router.route("/").post(createPlaylist)
 
