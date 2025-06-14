@@ -3,7 +3,7 @@ import Playlist from "../models/playlist.models.js";
 import Video from "../models/video.models.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import {asyncHandler} from "../utils/asyncHandler.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 const getPopulatedPlaylistById = (id) => {
   return Playlist.findById(id)
@@ -12,7 +12,7 @@ const getPopulatedPlaylistById = (id) => {
 };
 
 const checkPlaylistOwnership = (playlist, userId) => {
-  if (playlist.owner.toString() !== userId.toString()) {
+  if (playlist.owner._id.toString() !== userId.toString()) {
     throw new ApiError(403, "You are not authorized to perform this action");
   }
 };
@@ -21,7 +21,7 @@ const createPlaylist = asyncHandler(async (req, res) => {
   const { name, description } = req.body;
 
   if (!name || !description) {
-    throw new ApiError(400, "Name and description are required");
+    throw new ApiError(400, "name and description are required");
   }
 
   if (name.length < 3 || name.length > 50) {
@@ -100,9 +100,9 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
 
   if (!video) throw new ApiError(404, "Video not found");
 
-  const exists = playlist.videos.some(
-    (vid) => vid.toString() === videoId.toString()
-  );
+const exists = playlist.videos.some(
+  (vid) => vid._id.toString() === videoId.toString()
+);
 
   if (exists) {
     throw new ApiError(400, "Video already exists in the playlist");
@@ -128,7 +128,7 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid playlist or video ID format");
   }
 
-  const playlist = await getPopulatedPlaylistById(playlistId);
+  const playlist = await Playlist.findById(playlistId);
 
   if (!playlist) {
     throw new ApiError(404, "Playlist not found");
@@ -137,11 +137,10 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
   checkPlaylistOwnership(playlist, req.user._id);
 
   const video = await Video.findById(videoId);
-
   if (!video) throw new ApiError(404, "Video not found");
 
   const videoExists = playlist.videos.some(
-    (vid) => vid.toString() === videoId.toString()
+    (vidId) => vidId.toString() === videoId.toString()
   );
 
   if (!videoExists) {
@@ -149,7 +148,7 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
   }
 
   playlist.videos = playlist.videos.filter(
-    (vid) => vid.toString() !== videoId.toString()
+    (vidId) => vidId.toString() !== videoId.toString()
   );
 
   await playlist.save();
@@ -158,13 +157,9 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
 
   res
     .status(200)
-    .json(
-      new ApiResponse(
-        updatedPlaylist,
-        "Video removed from playlist successfully"
-      )
-    );
+    .json(new ApiResponse(updatedPlaylist, "Video removed from playlist successfully"));
 });
+
 
 const deletePlaylist = asyncHandler(async (req, res) => {
   const { playlistId } = req.params;
@@ -172,8 +167,11 @@ const deletePlaylist = asyncHandler(async (req, res) => {
   if (!isValidObjectId(playlistId)) {
     throw new ApiError(400, "Invalid playlist ID format");
   }
-
   const playlist = await Playlist.findById(playlistId);
+
+  if(playlist.owner.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "You are not authorized to delete this playlist");
+  }
 
   if (!playlist) {
     throw new ApiError(404, "Playlist not found");
@@ -194,10 +192,6 @@ const updatePlaylist = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid playlist ID format");
   }
 
-  if (!name || !description) {
-    throw new ApiError(400, "Name and description are required");
-  }
-
   const playlist = await Playlist.findById(playlistId);
 
   if (!playlist) {
@@ -206,13 +200,13 @@ const updatePlaylist = asyncHandler(async (req, res) => {
 
   checkPlaylistOwnership(playlist, req.user._id);
 
-  if (name.length < 3 || name.length > 50) {
-    throw new ApiError(400, "Name must be between 3 and 50 characters");
+  if (description && description.length > 20 && description.length <= 200) {
+    playlist.description = description;
   }
 
-  playlist.name = name;
-
-  playlist.description = description;
+  if (name && name.length >= 3 && name.length <= 50) {
+    playlist.name = name;
+  }
 
   await playlist.save();
 
