@@ -68,60 +68,44 @@ const getAllPublishedVideos = asyncHandler(async (req, res) => {
   const pipeline = [
     { $match: matchStage },
     {
-      $facet: {
-        metadata: [
-          {
-            $count: "totalVideos",
-          },
-        ],
-        data: [
-          { $sort: { [sortBy]: sortOrder } },
-          { $skip: (page - 1) * limit },
-          { $limit: limit },
-          {
-            $lookup: {
-              from: "users",
-              localField: "owner",
-              foreignField: "_id",
-              as: "owner",
-            },
-          },
-          {
-            $unwind: "$owner",
-          },
-          {
-            $project: {
-              _id: 1,
-              title: 1,
-              thumbnail: 1,
-              duration: 1,
-              views: 1,
-              isPublished: 1,
-              createdAt: 1,
-              "owner._id": 1,
-              "owner.userName": 1,
-              "owner.profilePicture": 1,
-            },
-          },
-        ],
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+      },
+    },
+    {
+      $unwind: "$owner",
+    },
+    {
+      $project: {
+        _id: 1,
+        title: 1,
+        thumbnail: 1,
+        duration: 1,
+        views: 1,
+        isPublished: 1,
+        createdAt: 1,
+        "owner._id": 1,
+        "owner.userName": 1,
+        "owner.profilePicture": 1,
       },
     },
   ];
 
-  const result = await Video.aggregate(pipeline);
-  const videos = result[0]?.data || [];
-  const totalVideos = result[0].metadata[0]?.totalVideos || 0;
-  const totalPages = Math.ceil(totalVideos / limit);
+  const options = {
+    page: page || 1,
+    limit: limit || 30,
+    sort: { [sortBy]: sortOrder },
+  };
+
+  const aggregate = Video.aggregate(pipeline);
+  const result = await Video.aggregatePaginate(aggregate, options);
 
   res
     .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        { videos, totalPages, totalVideos },
-        "Videos fetched successfully"
-      )
-    );
+    .json(new ApiResponse(200, result, "Videos fetched successfully"));
 });
 
 const getAllVideos = asyncHandler(async (req, res) => {
@@ -135,10 +119,13 @@ const getAllVideos = asyncHandler(async (req, res) => {
     throw new ApiError(400, "User ID is required and must be a valid ObjectId");
   }
 
-  if(userId !== req.user._id.toString()) {
-    throw new ApiError(403, "You are not authorized to view this user's videos");
+  if (userId !== req.user._id.toString()) {
+    throw new ApiError(
+      403,
+      "You are not authorized to view this user's videos"
+    );
   }
-  
+
   page = parseInt(page);
   limit = parseInt(limit);
 
@@ -183,61 +170,51 @@ const getAllVideos = asyncHandler(async (req, res) => {
   const pipeline = [
     { $match: matchStage },
     {
-      $facet: {
-        metadata: [
-          {
-            $count: "totalVideos",
-          },
-        ],
-        data: [
-          { $sort: { [sortBy]: sortOrder } },
-          { $skip: (page - 1) * limit },
-          { $limit: limit },
-          {
-            $lookup: {
-              from: "users",
-              localField: "owner",
-              foreignField: "_id",
-              as: "owner",
-            },
-          },
-          {
-            $unwind: "$owner",
-          },
-          {
-            $project: {
-              _id: 1,
-              title: 1,
-              thumbnail: 1,
-              duration: 1,
-              views: 1,
-              isPublished: 1,
-              createdAt: 1,
-              "owner._id": 1,
-              "owner.userName": 1,
-              "owner.profilePicture": 1,
-            },
-          },
-        ],
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+      },
+    },
+    {
+      $unwind: "$owner",
+    },
+    {
+      $project: {
+        _id: 1,
+        title: 1,
+        thumbnail: 1,
+        duration: 1,
+        views: 1,
+        isPublished: 1,
+        createdAt: 1,
+        "owner._id": 1,
+        "owner.userName": 1,
+        "owner.profilePicture": 1,
       },
     },
   ];
 
-  const result = await Video.aggregate(pipeline);
-  const videos = result[0]?.data || [];
-  const totalVideos = result[0].metadata[0]?.totalVideos || 0;
-  const totalPages = Math.ceil(totalVideos / limit);
+  const options = {
+    page: page || 1,
+    limit: limit || 30,
+    sort: { [sortBy]: sortOrder },
+  };
+
+  const aggregate = Video.aggregate(pipeline);
+  const result = await Video.aggregatePaginate(aggregate, options);
 
   res
     .status(200)
     .json(
       new ApiResponse(
         200,
-        { videos, totalPages, totalVideos },
+        result,
         "Videos fetched successfully"
       )
     );
-})
+});
 
 const publishAVideo = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
@@ -321,10 +298,9 @@ const getVideoById = asyncHandler(async (req, res) => {
     );
   }
 
-  const video = await Video.findById(videoId).populate(
-    "owner",
-    "_id userName profilePicture"
-  ).lean();
+  const video = await Video.findById(videoId)
+    .populate("owner", "_id userName profilePicture")
+    .lean();
 
   if (!video) {
     throw new ApiError(404, "Video not found");
@@ -339,7 +315,7 @@ const updateVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
 
   const { title, description } = req.body;
-  
+
   const thumbnailLocalPath = req.file.path;
 
   if (!videoId || !isValidObjectId(videoId)) {
@@ -368,7 +344,6 @@ const updateVideo = asyncHandler(async (req, res) => {
     if (description) video.description = description;
 
     if (req.file) {
-
       const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
 
       if (!thumbnail) {
@@ -408,13 +383,15 @@ const deleteVideo = asyncHandler(async (req, res) => {
   }
 
   try {
-    if(video?.publicId?.video) await deleteVideoFromCloudinary(video?.publicId?.video);
+    if (video?.publicId?.video)
+      await deleteVideoFromCloudinary(video?.publicId?.video);
   } catch (error) {
     console.error("Error deleting video from Cloudinary:", error);
   }
-  
+
   try {
-    if(video?.publicId?.thumbnail) await deleteFromCloudinary(video?.publicId?.thumbnail);
+    if (video?.publicId?.thumbnail)
+      await deleteFromCloudinary(video?.publicId?.thumbnail);
   } catch (error) {
     console.error("Error deleting thumbnail from Cloudinary:", error);
   }
@@ -455,5 +432,5 @@ export {
   updateVideo,
   deleteVideo,
   togglePublishStatus,
-  getAllVideos
+  getAllVideos,
 };
