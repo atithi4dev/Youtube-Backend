@@ -13,7 +13,7 @@ const likeToggler = async (req, res, targetType, targetId) => {
   if (!targetType || !targetId) {
     throw new ApiError(400, "Target type and ID are required");
   }
-
+  
   const userId = req.user._id;
 
   if (!isValidObjectId(userId)) {
@@ -53,33 +53,36 @@ const likeToggler = async (req, res, targetType, targetId) => {
 };
 
 const toggleVideoLike = asyncHandler(async (req, res) => {
-  const targetExists = await Video.findById(req.body.videoId);
+  const { videoId } = req.params;
+  const targetExists = await Video.findById(videoId);
 
   if (!targetExists) {
     throw new ApiError(404, "Video not found");
   }
 
-  await likeToggler(req, res, "video", req.body.videoId);
+  await likeToggler(req, res, "Video", videoId);
 });
 
 const toggleCommentLike = asyncHandler(async (req, res) => {
-  const targetExists = await Comment.findById(req.body.commentId);
-
+  const { commentId } = req.params;
+  const targetExists = await Comment.findById(commentId);
+  
   if (!targetExists) {
     throw new ApiError(404, "Comment not found");
   }
-
-  await likeToggler(req, res, "comment", req.body.commentId);
+  
+  await likeToggler(req, res, "Comment", commentId);
 });
 
 const toggleTweetLike = asyncHandler(async (req, res) => {
-  const targetExists = await Tweet.findById(req.body.tweetId);
+  const { tweetId } = req.params;
+  const targetExists = await Tweet.findById(tweetId);
 
   if (!targetExists) {
     throw new ApiError(404, "Tweet not found");
   }
 
-  await likeToggler(req, res, "tweet", req.body.tweetId);
+  await likeToggler(req, res, "Tweet", tweetId);
 });
 
 const getLikedVideos = asyncHandler(async (req, res) => {
@@ -91,8 +94,11 @@ const getLikedVideos = asyncHandler(async (req, res) => {
 
   const videos = await Like.find({
     likedBy: userId,
-    targetType: "video",
-  }).populate("targetId");
+    targetType: "Video",
+  }).populate({
+    path: "targetId",
+    model: "Video",
+  })
 
   return res
     .status(200)

@@ -3,7 +3,7 @@ import mongoose, {Schema} from "mongoose";
 const likeSchema = new Schema({
    targetType: {
      type: String,
-     enum: ["video", "comment", "tweet"],
+     enum: ["Video", "Comment", "Tweet"],
      required: true
    },
    targetId: {
