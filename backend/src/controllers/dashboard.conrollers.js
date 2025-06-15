@@ -1,20 +1,158 @@
-import mongoose from "mongoose"
-import {Video} from "../models/video.models.js"
-import {Subscription} from "../models/subscription.models.js"
-import {Like} from "../models/like.models.js"
-import {ApiError} from "../utils/ApiError.js"
-import {ApiResponse} from "../utils/ApiResponse.js"
-import {asyncHandler} from "../utils/asyncHandler.js"
+import mongoose from "mongoose";
+import Video from "../models/video.models.js";
+import Subscription from "../models/subscription.models.js";
+import Like from "../models/like.models.js";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { isValidObjectId } from "mongoose";
 
 const getChannelStats = asyncHandler(async (req, res) => {
-    // TODO: Get the channel stats like total video views, total subscribers, total videos, total likes etc.
-})
+  const { channelId } = req.params;
+  if (!channelId) {
+    throw new ApiError(400, "Channel ID is required");
+  }
+
+  if (!isValidObjectId(channelId)) {
+    throw new ApiError(400, "Channel ID must be a valid ObjectId");
+  }
+
+  const totalVideos = await Video.countDocuments({
+    owner: new mongoose.Types.ObjectId(channelId),
+    isPublished: true,
+  });
+
+  const totalSubscribers = await Subscription.countDocuments({
+    channel: new mongoose.Types.ObjectId(channelId),
+  });
+
+  let videos = await Video.find({
+    owner: new mongoose.Types.ObjectId(channelId),
+    isPublished: true,
+  }).lean();
+
+  const videoIds = videos.map((v) => v._id);
+  const totalLikes = await Like.countDocuments({
+    targetType: "Video",
+    targetId: { $in: videoIds },
+  });
+
+  const totalViews = videos.reduce((acc, curr) => acc + (curr.views || 0), 0);
+
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { totalLikes, totalViews, totalSubscribers, totalVideos },
+        "Channel stats fetched successfully"
+      )
+    );
+});
 
 const getChannelVideos = asyncHandler(async (req, res) => {
-    // TODO: Get all the videos uploaded by the channel
-})
+  let { page = 1, limit = 10, query, userId } = req.query;
+  let { sortBy = "createdAt", sortType = "desc" } = req.query;
 
-export {
-    getChannelStats, 
-    getChannelVideos
-    }
+  let allowedSortTypes = ["asc", "desc"];
+  let allowedSortByFields = ["createdat", "duration"];
+
+  if (userId && !isValidObjectId(userId)) {
+    throw new ApiError(400, "User ID is required and must be a valid ObjectId");
+  }
+
+  page = parseInt(page);
+  limit = parseInt(limit);
+
+  if (!page || !limit) {
+    throw new ApiError(400, "Page and limit are required");
+  }
+
+  let matchStage = {
+    isPublished: true,
+  };
+  if (userId) {
+    matchStage.owner = new mongoose.Types.ObjectId(userId);
+  }
+
+  if (query) {
+    let queryWords = query.split(" ");
+    matchStage.$or = queryWords.flatMap((word) => [
+      { title: { $regex: word, $options: "i" } },
+      { description: { $regex: word, $options: "i" } },
+    ]);
+  }
+
+  sortType = sortType.toLowerCase();
+
+  if (!allowedSortTypes.includes(sortType)) {
+    throw new ApiError(
+      400,
+      `Sort type must be one of ${allowedSortTypes.join(", ")}`
+    );
+  }
+
+  let sortOrder = sortType === "asc" ? 1 : -1;
+
+  sortBy = sortBy.toLowerCase();
+
+  if (!allowedSortByFields.includes(sortBy)) {
+    throw new ApiError(
+      400,
+      `Sort by must be one of ${allowedSortByFields.join(", ")}`
+    );
+  }
+
+  if (sortBy === "createdat") {
+    sortBy = "createdAt";
+  }
+
+  const pipeline = [
+    { $match: matchStage },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+      },
+    },
+    {
+      $unwind: "$owner",
+    },
+    {
+      $project: {
+        _id: 1,
+        title: 1,
+        thumbnail: 1,
+        duration: 1,
+        views: 1,
+        isPublished: 1,
+        createdAt: 1,
+        "owner._id": 1,
+        "owner.userName": 1,
+        "owner.profilePicture": 1,
+      },
+    },
+  ];
+
+  const options = {
+    page: page || 1,
+    limit: limit || 30,
+    sort: { [sortBy]: sortOrder },
+  };
+
+  const aggregate = Video.aggregate(pipeline);
+  const result = await Video.aggregatePaginate(aggregate, options);
+  if (page > result.totalPages) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, null, "Requested page exceeds total pages."));
+  }
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, result, "Videos fetched successfully"));
+});
+
+export { getChannelStats, getChannelVideos };

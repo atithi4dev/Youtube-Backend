@@ -1,7 +1,8 @@
-import mongoose, { isValidObjectId } from "mongoose";
+import { isValidObjectId } from "mongoose";
 import Video from "../models/video.models.js";
 import Subscription from "../models/subscription.models.js";
 import Like from "../models/like.models.js";
+import User from "../models/user.models.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -12,111 +13,6 @@ import {
   deleteFromCloudinary,
 } from "../utils/Cloudinary.js";
 import fs from "fs";
-
-const getAllPublishedVideos = asyncHandler(async (req, res) => {
-  let { page = 1, limit = 10, query, userId } = req.query;
-  let { sortBy = "createdAt", sortType = "desc" } = req.query;
-
-  let allowedSortTypes = ["asc", "desc"];
-  let allowedSortByFields = ["createdat", "duration"];
-
-  if (userId && !isValidObjectId(userId)) {
-    throw new ApiError(400, "User ID is required and must be a valid ObjectId");
-  }
-
-  page = parseInt(page);
-  limit = parseInt(limit);
-
-  if (!page || !limit) {
-    throw new ApiError(400, "Page and limit are required");
-  }
-
-  let matchStage = {
-    isPublished: true,
-  };
-  if (userId) {
-    matchStage.owner = new mongoose.Types.ObjectId(userId);
-  }
-
-  if (query) {
-    let queryWords = query.split(" ");
-    matchStage.$or = await queryWords.flatMap((word) => [
-      { title: { $regex: query, $options: "i" } },
-      { description: { $regex: query, $options: "i" } },
-    ]);
-  }
-
-  sortType = sortType.toLowerCase();
-
-  if (!allowedSortTypes.includes(sortType)) {
-    throw new ApiError(
-      400,
-      `Sort type must be one of ${allowedSortTypes.join(", ")}`
-    );
-  }
-
-  let sortOrder = sortType === "asc" ? 1 : -1;
-
-  sortBy = sortBy.toLowerCase();
-
-  if (!allowedSortByFields.includes(sortBy)) {
-    throw new ApiError(
-      400,
-      `Sort by must be one of ${allowedSortByFields.join(", ")}`
-    );
-  }
-
-  if (sortBy === "createdat") {
-    sortBy = "createdAt";
-  }
-
-  const pipeline = [
-    { $match: matchStage },
-    {
-      $lookup: {
-        from: "users",
-        localField: "owner",
-        foreignField: "_id",
-        as: "owner",
-      },
-    },
-    {
-      $unwind: "$owner",
-    },
-    {
-      $project: {
-        _id: 1,
-        title: 1,
-        thumbnail: 1,
-        duration: 1,
-        views: 1,
-        isPublished: 1,
-        createdAt: 1,
-        "owner._id": 1,
-        "owner.userName": 1,
-        "owner.profilePicture": 1,
-      },
-    },
-  ];
-
-  const options = {
-    page: page || 1,
-    limit: limit || 30,
-    sort: { [sortBy]: sortOrder },
-  };
-
-  const aggregate = Video.aggregate(pipeline);
-  const result = await Video.aggregatePaginate(aggregate, options);
-  if (page > result.totalPages) {
-    return res
-      .status(400)
-      .json(new ApiResponse(400, null, "Requested page exceeds total pages."));
-  }
-
-  res
-    .status(200)
-    .json(new ApiResponse(200, result, "Videos fetched successfully"));
-});
 
 const getAllOwnVideos = asyncHandler(async (req, res) => {
   let { page = 1, limit = 10, query } = req.query;
@@ -210,6 +106,111 @@ const getAllOwnVideos = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, result, "Videos fetched successfully"));
 });
 
+const getAllPublishedVideos = asyncHandler(async (req, res) => {
+  let { page = 1, limit = 10, query, userId } = req.query;
+  let { sortBy = "createdAt", sortType = "desc" } = req.query;
+
+  let allowedSortTypes = ["asc", "desc"];
+  let allowedSortByFields = ["createdat", "duration"];
+
+  if (userId && !isValidObjectId(userId)) {
+    throw new ApiError(400, "User ID is required and must be a valid ObjectId");
+  }
+
+  page = parseInt(page);
+  limit = parseInt(limit);
+
+  if (!page || !limit) {
+    throw new ApiError(400, "Page and limit are required");
+  }
+
+  let matchStage = {
+    isPublished: true,
+  };
+  if (userId) {
+    matchStage.owner = new mongoose.Types.ObjectId(userId);
+  }
+
+  if (query) {
+    let queryWords = query.split(" ");
+    matchStage.$or = queryWords.flatMap((word) => [
+      { title: { $regex: word, $options: "i" } },
+      { description: { $regex: word, $options: "i" } },
+    ]);
+  }
+
+  sortType = sortType.toLowerCase();
+
+  if (!allowedSortTypes.includes(sortType)) {
+    throw new ApiError(
+      400,
+      `Sort type must be one of ${allowedSortTypes.join(", ")}`
+    );
+  }
+
+  let sortOrder = sortType === "asc" ? 1 : -1;
+
+  sortBy = sortBy.toLowerCase();
+
+  if (!allowedSortByFields.includes(sortBy)) {
+    throw new ApiError(
+      400,
+      `Sort by must be one of ${allowedSortByFields.join(", ")}`
+    );
+  }
+
+  if (sortBy === "createdat") {
+    sortBy = "createdAt";
+  }
+
+  const pipeline = [
+    { $match: matchStage },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+      },
+    },
+    {
+      $unwind: "$owner",
+    },
+    {
+      $project: {
+        _id: 1,
+        title: 1,
+        thumbnail: 1,
+        duration: 1,
+        views: 1,
+        isPublished: 1,
+        createdAt: 1,
+        "owner._id": 1,
+        "owner.userName": 1,
+        "owner.profilePicture": 1,
+      },
+    },
+  ];
+
+  const options = {
+    page: page || 1,
+    limit: limit || 30,
+    sort: { [sortBy]: sortOrder },
+  };
+
+  const aggregate = Video.aggregate(pipeline);
+  const result = await Video.aggregatePaginate(aggregate, options);
+  if (page > result.totalPages) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, null, "Requested page exceeds total pages."));
+  }
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, result, "Videos fetched successfully"));
+});
+
 const publishAVideo = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
 
@@ -292,7 +293,6 @@ const getVideoById = asyncHandler(async (req, res) => {
     );
   }
 
-
   const video = await Video.findById(videoId)
     .populate("owner", "_id userName profilePicture")
     .lean();
@@ -300,8 +300,20 @@ const getVideoById = asyncHandler(async (req, res) => {
   if (!video) {
     throw new ApiError(404, "Video not found");
   }
+  const userId = req.user?._id;
+  const user = await User.findById(userId);
+  const alreadyWatched = user.watchHistory.some(
+    (id) => id.toString() === videoId.toString()
+  );
+  if (!alreadyWatched) {
+    user.watchHistory.push(videoId);
+    await user.save();
+    await Video.findByIdAndUpdate(videoId, {
+      $inc: { views: 1 },
+    });
+  }
 
-    let isLikedByUser = false;
+  let isLikedByUser = false;
   isLikedByUser = (await Like.exists({
     targetType: "Video",
     targetId: videoId,
@@ -315,19 +327,25 @@ const getVideoById = asyncHandler(async (req, res) => {
     targetId: videoId,
   });
 
-
   let isOwnerSubscribed = false;
-  isOwnerSubscribed = await Subscription.exists({
+  isOwnerSubscribed = (await Subscription.exists({
     subscriber: req.user._id,
     channel: video.owner,
-  }) ? true : false;
+  }))
+    ? true
+    : false;
 
   return res
     .status(200)
     .json(
       new ApiResponse(
         200,
-        { ...video, likeCount: videoLikesCount, isLikedByUser, isOwnerSubscribed },
+        {
+          ...video,
+          likeCount: videoLikesCount,
+          isLikedByUser,
+          isOwnerSubscribed,
+        },
         "Video fetched successfully"
       )
     );
@@ -345,7 +363,7 @@ const updateVideo = asyncHandler(async (req, res) => {
     );
   }
 
-  if (!title && !description && !thumbnailLocalPath) {
+  if (!title && !description && !thumbnailLocalPath && !views) {
     throw new ApiError(
       400,
       "At least one of title, description, or thumbnail must be provided to update."
@@ -477,10 +495,10 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
 
 export {
   getAllPublishedVideos,
-  publishAVideo,
-  getVideoById,
-  updateVideo,
   deleteVideo,
+  getVideoById,
+  publishAVideo,
   togglePublishStatus,
+  updateVideo,
   getAllOwnVideos,
 };

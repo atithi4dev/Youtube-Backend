@@ -1,15 +1,15 @@
-// import { Router } from 'express';
-// import {
-//     getChannelStats,
-//     getChannelVideos,
-// } from "../controllers/dashboard.controllers.js"
-// import {verifyJwt} from "../middlewares/auth.middlewares.js"
+import { Router } from 'express';
+import {
+    getChannelStats,
+    getChannelVideos,
+} from "../controllers/dashboard.conrollers.js"
+import {verifyJwt} from "../middlewares/auth.middlewares.js"
 
-// const router = Router();
+const router = Router();
 
-// router.use(verifyJwt); // Apply verifyJwt middleware to all routes in this file
+router.use(verifyJwt); // Apply verifyJwt middleware to all routes in this file
 
-// router.route("/stats").get(getChannelStats);
-// router.route("/videos").get(getChannelVideos);
+router.route("/stats/:channelId").get(getChannelStats);
+router.route("/videos").get(getChannelVideos);
 
-// export default router
+export default router
