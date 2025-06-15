@@ -1,5 +1,7 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import Video from "../models/video.models.js";
+import Subscription from "../models/subscription.models.js";
+import Like from "../models/like.models.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -32,7 +34,7 @@ const getAllPublishedVideos = asyncHandler(async (req, res) => {
   let matchStage = {
     isPublished: true,
   };
-  if(userId) {
+  if (userId) {
     matchStage.owner = new mongoose.Types.ObjectId(userId);
   }
 
@@ -290,6 +292,7 @@ const getVideoById = asyncHandler(async (req, res) => {
     );
   }
 
+
   const video = await Video.findById(videoId)
     .populate("owner", "_id userName profilePicture")
     .lean();
@@ -298,9 +301,36 @@ const getVideoById = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video not found");
   }
 
+    let isLikedByUser = false;
+  isLikedByUser = (await Like.exists({
+    targetType: "Video",
+    targetId: videoId,
+    likedBy: req.user._id,
+  }))
+    ? true
+    : false;
+
+  const videoLikesCount = await Like.countDocuments({
+    targetType: "Video",
+    targetId: videoId,
+  });
+
+
+  let isOwnerSubscribed = false;
+  isOwnerSubscribed = await Subscription.exists({
+    subscriber: req.user._id,
+    channel: video.owner,
+  }) ? true : false;
+
   return res
     .status(200)
-    .json(new ApiResponse(200, video, "Video fetched successfully"));
+    .json(
+      new ApiResponse(
+        200,
+        { ...video, likeCount: videoLikesCount, isLikedByUser, isOwnerSubscribed },
+        "Video fetched successfully"
+      )
+    );
 });
 
 const updateVideo = asyncHandler(async (req, res) => {
@@ -376,10 +406,18 @@ const deleteVideo = asyncHandler(async (req, res) => {
   if (!video) {
     throw new ApiError(404, "Video not found");
   }
-  if(video.owner.toString() !== req.user._id.toString()) {
-    res.status(403).json( new ApiResponse(403, null, "You are not authorized to delete this video"));
+  if (video.owner.toString() !== req.user._id.toString()) {
+    res
+      .status(403)
+      .json(
+        new ApiResponse(
+          403,
+          null,
+          "You are not authorized to delete this video"
+        )
+      );
   }
-  
+
   try {
     if (video?.publicId?.video)
       await deleteVideoFromCloudinary(video?.publicId?.video);
@@ -410,13 +448,19 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
   }
 
   const video = await Video.findById(videoId);
-  if(!video) {
+  if (!video) {
     throw new ApiError(404, "Video not found");
   }
-  if(video.owner.toString() !== req.user._id.toString()) {
-    res.status(403).json(
-      new ApiResponse(403, null, "You are not authorized to toggle publish status of this video")
-    );
+  if (video.owner.toString() !== req.user._id.toString()) {
+    res
+      .status(403)
+      .json(
+        new ApiResponse(
+          403,
+          null,
+          "You are not authorized to toggle publish status of this video"
+        )
+      );
   }
   video.isPublished = !video.isPublished;
   await video.save();
@@ -430,7 +474,6 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
       )
     );
 });
-
 
 export {
   getAllPublishedVideos,

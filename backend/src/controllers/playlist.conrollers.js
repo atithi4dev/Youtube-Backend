@@ -42,7 +42,7 @@ const createPlaylist = asyncHandler(async (req, res) => {
 
   res
     .status(201)
-    .json(new ApiResponse(playlist, "Playlist created successfully"));
+    .json(new ApiResponse(201, playlist, "Playlist created successfully"));
 });
 
 const getUserPlaylists = asyncHandler(async (req, res) => {
@@ -60,7 +60,7 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
 
   res
     .status(200)
-    .json(new ApiResponse(playlists, "Playlists retrieved successfully"));
+    .json(new ApiResponse(200, playlists, "Playlists retrieved successfully"));
 });
 
 const getPlaylistById = asyncHandler(async (req, res) => {
@@ -78,7 +78,7 @@ const getPlaylistById = asyncHandler(async (req, res) => {
 
   res
     .status(200)
-    .json(new ApiResponse(playlist, "Playlist retrieved successfully"));
+    .json(new ApiResponse(200, playlist, "Playlist retrieved successfully"));
 });
 
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
@@ -117,7 +117,7 @@ const exists = playlist.videos.some(
   res
     .status(200)
     .json(
-      new ApiResponse(updatedPlaylist, "Video added to playlist successfully")
+      new ApiResponse(200, updatedPlaylist, "Video added to playlist successfully")
     );
 });
 
@@ -157,7 +157,7 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
 
   res
     .status(200)
-    .json(new ApiResponse(updatedPlaylist, "Video removed from playlist successfully"));
+    .json(new ApiResponse(200, updatedPlaylist, "Video removed from playlist successfully"));
 });
 
 
@@ -181,7 +181,7 @@ const deletePlaylist = asyncHandler(async (req, res) => {
 
   await Playlist.findByIdAndDelete(playlistId);
 
-  res.status(200).json(new ApiResponse(null, "Playlist deleted successfully"));
+  res.status(200).json(new ApiResponse(200, null, "Playlist deleted successfully"));
 });
 
 const updatePlaylist = asyncHandler(async (req, res) => {
@@ -214,7 +214,7 @@ const updatePlaylist = asyncHandler(async (req, res) => {
 
   res
     .status(200)
-    .json(new ApiResponse(updatedPlaylist, "Playlist updated successfully"));
+    .json(new ApiResponse(200, updatedPlaylist, "Playlist updated successfully"));
 });
 
 export {

@@ -49,7 +49,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
         pipeline: [
           {
             $match: {
-              targetType: "comment",
+              targetType: "Comment",
               likedBy: new mongoose.Types.ObjectId(req.user._id),
             },
           },
@@ -83,7 +83,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Comments fetched successfully", comments));
+    .json(new ApiResponse(200, comments, "Comments fetched successfully"));
 });
 
 const addComment = asyncHandler(async (req, res) => {
@@ -108,7 +108,7 @@ const addComment = asyncHandler(async (req, res) => {
 
   return res
     .status(201)
-    .json(new ApiResponse(201, "Comment added successfully", comment));
+    .json(new ApiResponse(201, comment, "Comment added successfully"));
 });
 
 const updateComment = asyncHandler(async (req, res) => {
@@ -136,7 +136,7 @@ const updateComment = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Comment updated successfully", updatedComment));
+    .json(new ApiResponse(200, updatedComment, "Comment updated successfully"));
 });
 
 const deleteComment = asyncHandler(async (req, res) => {
@@ -157,7 +157,12 @@ const deleteComment = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Comment deleted successfully", deletedComment));
+    .json(new ApiResponse(200, deletedComment, "Comment deleted successfully"));
 });
 
 export { getVideoComments, addComment, updateComment, deleteComment };
+
+
+
+
+

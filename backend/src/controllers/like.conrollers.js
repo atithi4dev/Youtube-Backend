@@ -34,7 +34,7 @@ const likeToggler = async (req, res, targetType, targetId) => {
 
     return res
       .status(200)
-      .json(new ApiResponse("Like removed successfully", { liked: false }));
+      .json(new ApiResponse(200, { liked: false }, "Like removed successfully"));
   } else {
     const newLike = await Like.create({
       likedBy: userId,
@@ -43,10 +43,10 @@ const likeToggler = async (req, res, targetType, targetId) => {
     });
 
     return res.status(201).json(
-      new ApiResponse("Like added successfully", {
+      new ApiResponse(201, {
         liked: true,
         like: newLike,
-      })
+      }, "Like added successfully")
     );
   }
 };
@@ -101,7 +101,7 @@ const getLikedVideos = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse("Liked videos fetched successfully", videos));
+    .json(new ApiResponse(200,videos, "Liked videos fetched successfully"));
 });
 
 export { toggleCommentLike, toggleTweetLike, toggleVideoLike, getLikedVideos };

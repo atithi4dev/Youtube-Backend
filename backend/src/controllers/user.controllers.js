@@ -1,6 +1,6 @@
 import {asyncHandler} from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
-import { User } from "../models/user.models.js";
+import User from "../models/user.models.js";
 import mongoose from "mongoose";  
 import {
   uploadOnCloudinary,
@@ -41,7 +41,6 @@ const registerUser = asyncHandler(async (req, res) => {
 
   const { userName, email, fullName, password } = req.body;
 
-  // Validation
   ["fullName", "userName", "email", "password"].forEach((field) => {
     if (!req.body[field]?.trim()) {
       throw new ApiError(400, `All fields are required.`);
@@ -481,7 +480,6 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
           }
         },
         {
-          // project only necessary data:
           $project: {
             fullName: 1,
             userName: 1,
@@ -553,24 +551,6 @@ const getWatchHistory = asyncHandler(async (req, res) => {
   )
 
   return res.status(200).json(new ApiResponse(200, user[0]?.watchHistory, "Watch history fetched successfully"))
-
-// How pipeline works in aggregation:
-//   {
-//   _id: "user123",
-//   name: "Abhay",
-//   watchHistory: [
-//     {
-//       _id: "vid1",
-//       title: "MongoDB Tutorial",
-//       owner: {
-//         fullName: "Dev Singh",
-//         userName: "devcoder",
-//         avatar: "dev.jpg"
-//       }
-//     },
-//     ...
-//   ]
-// }
 
 })
 
