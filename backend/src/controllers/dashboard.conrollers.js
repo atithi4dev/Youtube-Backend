@@ -51,14 +51,18 @@ const getChannelStats = asyncHandler(async (req, res) => {
 });
 
 const getChannelVideos = asyncHandler(async (req, res) => {
-  let { page = 1, limit = 10, query, userId } = req.query;
+  let { page = 1, limit = 10, query, channelId } = req.query;
   let { sortBy = "createdAt", sortType = "desc" } = req.query;
 
   let allowedSortTypes = ["asc", "desc"];
   let allowedSortByFields = ["createdat", "duration"];
 
-  if (userId && !isValidObjectId(userId)) {
-    throw new ApiError(400, "User ID is required and must be a valid ObjectId");
+  if(!channelId){
+    throw new ApiError(400, "Channel ID is required");
+  }
+
+  if (!isValidObjectId(channelId)) {
+    throw new ApiError(400, "Channel ID is required and must be a valid ObjectId");
   }
 
   page = parseInt(page);
@@ -71,8 +75,8 @@ const getChannelVideos = asyncHandler(async (req, res) => {
   let matchStage = {
     isPublished: true,
   };
-  if (userId) {
-    matchStage.owner = new mongoose.Types.ObjectId(userId);
+  if (channelId) {
+    matchStage.owner = new mongoose.Types.ObjectId(channelId);
   }
 
   if (query) {
