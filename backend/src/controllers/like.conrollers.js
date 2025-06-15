@@ -7,7 +7,6 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
-// video, comment, tweet, likedBy
 
 const likeToggler = async (req, res, targetType, targetId) => {
   if (!targetType || !targetId) {
