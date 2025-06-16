@@ -167,7 +167,7 @@ _A clean architecture layout using modular structure for scalability._
 
 ## 📜 License
 
-This project is licensed under the **ISC License**.
+This project is licensed under the **MIT License**.
 
 ---
 
