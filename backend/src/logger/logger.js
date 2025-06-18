@@ -9,16 +9,24 @@ const consoleLogFormat = format.combine(
   })
 );
 
+const fileLogFormat = combine(
+  timestamp(),
+  json()
+);
+
 // Create a Winston logger
 const logger = createLogger({
   level: "info",
-  format: combine(colorize(), timestamp(), json()),
   transports: [
     new transports.Console({
       format: consoleLogFormat,
     }),
-    new transports.File({ filename: "app.log" }),
+    new transports.File({
+      filename: "logs/app.log",
+      format: fileLogFormat,
+    }),
   ],
 });
+
  
 export default logger;

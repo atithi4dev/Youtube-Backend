@@ -1,5 +1,6 @@
 import {app} from "./app.js";
 import dotenv from "dotenv";
+import logger from "./logger/logger.js";
 import connectDB from "./db/index.js";
 
 dotenv.config({
@@ -10,10 +11,10 @@ const PORT = process.env.PORT || 3000;
 connectDB()
 .then(() => {
      app.listen(PORT, () => {
-          console.log(`Server is running on port ${PORT}`);
+          logger.info(`Server is running on port ${PORT}`);
      });
 })
 .catch((err) => {
-     console.error("Database connection failed:", err);
+     logger.error("Database connection failed:", err);
      process.exit(1);
 })

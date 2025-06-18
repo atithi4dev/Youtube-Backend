@@ -11,7 +11,6 @@ const getVideoComments = asyncHandler(async (req, res) => {
   if (!isValidObjectId(videoId)) {
     throw new ApiError(400, "Please provide a valid video ID");
   }
-  console.log("Fetching comments for video ID:", videoId);
   const pipeline = [
     {
       $match: {

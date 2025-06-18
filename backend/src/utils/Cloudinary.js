@@ -1,6 +1,7 @@
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
 import dotenv from "dotenv";
+import logger from "../logger/logger.js";
 dotenv.config();
 
 // Configuration Of Cloudinary
@@ -16,7 +17,6 @@ const uploadOnCloudinary = async (localFilePath) => {
       resource_type: "auto",
       folder: "images",
     });
-    console.log("File uploaded on cloudinary File src:", response.url);
 
     fs.unlinkSync(localFilePath);
     return response;
@@ -43,9 +43,8 @@ const uploadVideoOnCloudinary = async (localFilePath) => {
 const deleteFromCloudinary = async (publicId) => {
   try {
     const result = await cloudinary.uploader.destroy(publicId);
-    console.log("File deleted from Cloudinary:", result);
   } catch (error) {
-    console.error("Error deleting file from Cloudinary:", error);
+    logger.error("Error deleting from Cloudinary:", error);
     return null;
   }
 };
@@ -55,9 +54,8 @@ const deleteVideoFromCloudinary = async (publicId) => {
     const result = await cloudinary.uploader.destroy(publicId, {
       resource_type: "video",
     });
-    console.log("Video deleted from Cloudinary:", result);
   } catch (error) {
-    console.error("Error deleting video from Cloudinary:", error);
+    logger.error("Error deleting video from Cloudinary:", error);
     return null;
   }
 };

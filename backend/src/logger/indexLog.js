@@ -21,17 +21,3 @@ const morganMiddleware = () => {
 
 
 export default morganMiddleware;
-
-
-
-
-
-
-
-
-// This code sets up a middleware for logging HTTP requests using Morgan.
-// It formats the log messages to include the HTTP method, URL, status code, and response time.
-// The log messages are then written to the logger, which can be configured to log to the console or a file.
-// The `morganMiddleware` function can be used in an Express application to log incoming requests.
-// import morganMiddleware from "logger/indexLog.js";
-// app.use(morganMiddleware());   (Make sure to use this in your Express app setup after const app = express())

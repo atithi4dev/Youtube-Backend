@@ -64,7 +64,6 @@ const registerUser = asyncHandler(async (req, res) => {
   if (avatarLocalPath) {
     try {
       avatar = await uploadOnCloudinary(avatarLocalPath);
-      console.log("Avatar uploaded successfully:", avatar);
     } catch (error) {
       console.error("Error uploading avatar:", error);
       throw new ApiError(500, "Failed to upload avatar image");
@@ -75,7 +74,6 @@ const registerUser = asyncHandler(async (req, res) => {
   if (coverImageLocalPath) {
     try {
       coverImage = await uploadOnCloudinary(coverImageLocalPath);
-      console.log("coverImage uploaded successfully:", coverImage);
     } catch (error) {
       console.error("Error uploading coverImage:", error);
       throw new ApiError(500, "Failed to upload coverImage image");
@@ -110,7 +108,7 @@ const registerUser = asyncHandler(async (req, res) => {
     if (!createdUser) {
       throw new ApiError(500, "User creation failed");
     }
-
+    console.log("User Created Successfully:", createdUser);
     return res
       .status(201)
       .json(new ApiResponse(201, createdUser, "User registered successfully"));
@@ -130,8 +128,6 @@ const registerUser = asyncHandler(async (req, res) => {
 });
 
 const loginUser = asyncHandler(async (req, res) => {
-  // get data from body
-  console.log(req.body)
   const { email, userName, password } = req.body;
 
   // validation
@@ -493,8 +489,6 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
         }
       ]
     )
-console.log("Queried username:", username);
-  console.log("Aggregation result:", channel);
     if(!channel || channel.length === 0) {
         throw new ApiError(404, "Channel not found");
     }
