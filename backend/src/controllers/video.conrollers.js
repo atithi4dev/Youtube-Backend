@@ -6,6 +6,7 @@ import User from "../models/user.models.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { videoQueue } from "../jobs/Queue/videoProcessor.queue.js";
 import {
   uploadVideoOnCloudinary,
   deleteVideoFromCloudinary,
@@ -266,6 +267,15 @@ const publishAVideo = asyncHandler(async (req, res) => {
       publicId,
     });
 
+    await videoQueue.add(
+      "transcode",
+      { id: "videoisMine" },
+      {
+        removeOnComplete: true,
+        removeOnFail: true,
+      }
+    );
+
     return res
       .status(201)
       .json(new ApiResponse(201, video, "Video published successfully"));
@@ -335,20 +345,18 @@ const getVideoById = asyncHandler(async (req, res) => {
     ? true
     : false;
 
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        {
-          ...video,
-          likeCount: videoLikesCount,
-          isLikedByUser,
-          isOwnerSubscribed,
-        },
-        "Video fetched successfully"
-      )
-    );
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        ...video,
+        likeCount: videoLikesCount,
+        isLikedByUser,
+        isOwnerSubscribed,
+      },
+      "Video fetched successfully"
+    )
+  );
 });
 
 const updateVideo = asyncHandler(async (req, res) => {
