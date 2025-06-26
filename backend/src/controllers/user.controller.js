@@ -5,9 +5,11 @@ import mongoose from "mongoose";
 import {
   uploadOnCloudinary,
   deleteFromCloudinary,
+  uploadFolderToCloudinary
 } from "../utils/Cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
+import path from 'path';
 
 const generateAccessAndRefreshToken = async (userId) => {
   if (!userId) {
@@ -339,29 +341,34 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   if (!user) {
     throw new ApiError(404, "User not found");
   }
+  const MAINPATH = path.join(process.cwd(), "public/HelloTest")
+  // console.log(MAINPATH)
 
-  // Delete old avatar from cloudinary if exists
-
+  uploadFolderToCloudinary(MAINPATH,"WHOKNOWS")
+  
   const public_id = user.imageDetails.find(
     (img) => img.name === "avatar"
   )?.publicId;
-
-  if (public_id) {
-    await deleteFromCloudinary(public_id);
-  }
-
+  
+  
   // Upload new avatar image to Cloudinary
-
+  
   const avatarLocalPath = req.file?.path;
-
+  
   if (!avatarLocalPath) {
     throw new ApiError(400, "Avatar image is required");
   }
-
+  
   let avatar = await uploadOnCloudinary(avatarLocalPath);
-
+  
   if (!avatar.url) {
     throw new ApiError(500, "Failed to upload avatar image");
+  }
+
+  // Delete old avatar from cloudinary if exists
+  
+  if (public_id) {
+    await deleteFromCloudinary(public_id);
   }
 
   user.avatar = avatar.url;

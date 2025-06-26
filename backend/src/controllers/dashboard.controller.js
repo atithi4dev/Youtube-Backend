@@ -29,7 +29,9 @@ const getChannelStats = asyncHandler(async (req, res) => {
   let videos = await Video.find({
     owner: new mongoose.Types.ObjectId(channelId),
     isPublished: true,
-  }).lean();
+  })
+    .sort({ views: -1 })
+    .lean();
 
   const videoIds = videos.map((v) => v._id);
   const totalLikes = await Like.countDocuments({
@@ -39,12 +41,20 @@ const getChannelStats = asyncHandler(async (req, res) => {
 
   const totalViews = videos.reduce((acc, curr) => acc + (curr.views || 0), 0);
 
+  const topTwentyVideos = videos.slice(0, 20);
+
   res
     .status(200)
     .json(
       new ApiResponse(
         200,
-        { totalLikes, totalViews, totalSubscribers, totalVideos },
+        {
+          totalLikes,
+          totalViews,
+          totalSubscribers,
+          totalVideos,
+          topTwentyVideos,
+        },
         "Channel stats fetched successfully"
       )
     );
@@ -57,12 +67,15 @@ const getChannelVideos = asyncHandler(async (req, res) => {
   let allowedSortTypes = ["asc", "desc"];
   let allowedSortByFields = ["createdat", "duration"];
 
-  if(!channelId){
+  if (!channelId) {
     throw new ApiError(400, "Channel ID is required");
   }
 
   if (!isValidObjectId(channelId)) {
-    throw new ApiError(400, "Channel ID is required and must be a valid ObjectId");
+    throw new ApiError(
+      400,
+      "Channel ID is required and must be a valid ObjectId"
+    );
   }
 
   page = parseInt(page);
@@ -159,4 +172,54 @@ const getChannelVideos = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, result, "Videos fetched successfully"));
 });
 
-export { getChannelStats, getChannelVideos };
+const getTopVideosByTimeframes = asyncHandler(async (req, res) => {
+    const { channelId } = req.params;
+  if (!channelId) {
+    throw new ApiError(400, "Channel ID is required");
+  }
+
+  if (!isValidObjectId(channelId)) {
+    throw new ApiError(400, "Channel ID must be a valid ObjectId");
+  }
+
+  const now = new Date();
+  const last7Days = new Date(now);
+  last7Days.setDate(now.getDate() - 7);
+
+  const last30Days = new Date(now);
+  last30Days.setDate(now.getDate() - 30);
+
+  const last1Year = new Date(now);
+  last1Year.setFullYear(now.getFullYear() - 1);
+
+  const timeframes = [
+    { label: "last7Days", date: last7Days },
+    { label: "last30Days", date: last30Days },
+    { label: "last1Year", date: last1Year },
+  ];
+
+  const results = {};
+
+  for (const timeframe of timeframes) {
+    const videos = await Video.find({
+      owner: new mongoose.Types.ObjectId(channelId),
+      isPublished: true,
+      createdAt: { $gte: timeframe.date },
+    })
+      .sort({ views: -1 })
+      .limit(5)
+      .lean();
+
+    results[timeframe.label] = videos;
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      results,
+      "Top videos for different timeframes fetched successfully"
+    )
+  );
+});
+
+export { getChannelStats, getChannelVideos, getTopVideosByTimeframes };

@@ -4,7 +4,7 @@ import {
     toggleCommentLike,
     toggleVideoLike,
     toggleTweetLike,
-} from "../controllers/like.conrollers.js"
+} from "../controllers/like.controller.js"
 import {verifyJwt} from "../middlewares/auth.middlewares.js"
 
 const router = Router();
