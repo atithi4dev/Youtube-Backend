@@ -1,4 +1,5 @@
 import { isValidObjectId } from "mongoose";
+import mongoose from "mongoose";
 import Video from "../models/video.models.js";
 import Subscription from "../models/subscription.models.js";
 import Like from "../models/like.models.js";
@@ -24,7 +25,6 @@ const getAllOwnVideos = asyncHandler(async (req, res) => {
 
   page = parseInt(page);
   limit = parseInt(limit);
-
   if (!page || !limit) {
     throw new ApiError(400, "Page and limit are required");
   }
@@ -33,10 +33,10 @@ const getAllOwnVideos = asyncHandler(async (req, res) => {
   matchStage.owner = req.user._id;
 
   if (query) {
-    const queryWords = query.split("+");
+    const queryWords = query.trim().split(/\s+/);
     matchStage.$or = await queryWords.flatMap((word) => [
-      { title: { $regex: query, $options: "i" } },
-      { description: { $regex: query, $options: "i" } },
+      { title: { $regex: word, $options: "i" } },
+      { description: { $regex: word, $options: "i" } },
     ]);
   }
 
@@ -223,13 +223,13 @@ const publishAVideo = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Video file and thumbnail are required");
   }
 
-  if (!title || !description) {
+  if (!title?.trim() || !description?.trim()) {
     throw new ApiError(400, "Title and description are required");
   }
 
   const videoLocalPath = req.files.videoFile[0].path;
   const thumbnailLocalPath = req.files.thumbnail[0].path;
-
+  const outputPath = "./public/output";
   let videoFile = null;
   let thumbnail = null;
 
@@ -256,7 +256,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
       video: videoFile?.public_id || null,
     };
 
-    const video = await Video.create({
+    const video = new Video({
       videoFile: videoFile?.url,
       thumbnail: thumbnail?.url,
       title,
@@ -267,10 +267,21 @@ const publishAVideo = asyncHandler(async (req, res) => {
       publicId,
     });
 
+    await video.save();
+
     await videoQueue.add(
-      "transcode",
-      { id: "videoisMine" },
+      "video-transcode",
       {
+        inputPath: videoLocalPath,
+        baseOutputPath: outputPath,
+        videoId: video._id,
+      },
+      {
+        attempts: 5,
+        backoff: {
+          type: "exponential",
+          delay: 1000,
+        },
         removeOnComplete: true,
         removeOnFail: true,
       }
@@ -282,8 +293,17 @@ const publishAVideo = asyncHandler(async (req, res) => {
   } catch (error) {
     console.error("Error publishing video:", error);
 
-    if (fs.existsSync(videoLocalPath)) fs.unlinkSync(videoLocalPath);
-    if (fs.existsSync(thumbnailLocalPath)) fs.unlinkSync(thumbnailLocalPath);
+    try {
+      await fs.promises.unlink(videoLocalPath);
+    } catch (err) {
+      console.warn("Video local file already deleted or not found.");
+    }
+
+    try {
+      await fs.promises.unlink(thumbnailLocalPath);
+    } catch (err) {
+      console.warn("Thumbnail local file already deleted or not found.");
+    }
 
     if (videoFile?.public_id)
       await deleteVideoFromCloudinary(videoFile.public_id);
@@ -361,7 +381,6 @@ const getVideoById = asyncHandler(async (req, res) => {
 
 const updateVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-
   const { title, description } = req.body;
 
   if (!videoId || !isValidObjectId(videoId)) {
@@ -371,40 +390,48 @@ const updateVideo = asyncHandler(async (req, res) => {
     );
   }
 
-  if (!title && !description && !thumbnailLocalPath && !views) {
+  const video = await Video.findById(videoId);
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  if (video.owner.toString() !== req.user._id.toString()) {
+    return res
+      .status(403)
+      .json(
+        new ApiResponse(
+          403,
+          null,
+          "You are not authorized to update this video"
+        )
+      );
+  }
+
+  const isThumbnailBeingUpdated = req.file?.path;
+
+  if (!title && !description && !isThumbnailBeingUpdated) {
     throw new ApiError(
       400,
       "At least one of title, description, or thumbnail must be provided to update."
     );
   }
 
-  const video = await Video.findById(videoId);
-
-  if (!video) {
-    throw new ApiError(404, "Video not found");
-  }
-
-  if (video?.owner.toString() !== req.user._id.toString()) {
-    throw new ApiError(403, "You are not authorized to update this video");
-  }
-
   try {
     if (title) video.title = title;
-
     if (description) video.description = description;
 
-    if (req.file) {
+    if (isThumbnailBeingUpdated) {
       const thumbnailLocalPath = req.file.path;
       const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
-      deleteFromCloudinary(video.publicId.thumbnail);
-      if (!thumbnail) {
-        fs.unlinkSync(thumbnailLocalPath);
+
+      if (!thumbnail?.url) {
         throw new ApiError(500, "Thumbnail upload failed");
       }
 
-      video.thumbnail = thumbnail.url;
+      await deleteFromCloudinary(video.publicId.thumbnail);
 
-      video.publicId.thumbnail = thumbnail?.public_id;
+      video.thumbnail = thumbnail.url;
+      video.publicId.thumbnail = thumbnail.public_id;
     }
 
     await video.save();
@@ -413,7 +440,8 @@ const updateVideo = asyncHandler(async (req, res) => {
       .status(200)
       .json(new ApiResponse(200, video, "Video details updated successfully"));
   } catch (error) {
-    throw new ApiError(400, "Unable to update video details");
+    console.error("Error updating video:", error);
+    throw new ApiError(500, error.message || "Unable to update video details");
   }
 });
 
@@ -433,7 +461,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video not found");
   }
   if (video.owner.toString() !== req.user._id.toString()) {
-    res
+    return res
       .status(403)
       .json(
         new ApiResponse(
@@ -478,7 +506,7 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video not found");
   }
   if (video.owner.toString() !== req.user._id.toString()) {
-    res
+    return res
       .status(403)
       .json(
         new ApiResponse(
@@ -501,6 +529,80 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     );
 });
 
+const adaptiveStream = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  if (!videoId || !isValidObjectId(videoId)) {
+    throw new ApiError(
+      400,
+      "Video ID is required and must be a valid ObjectId"
+    );
+  }
+  try {
+    const video = await Video.findById(videoId).lean();
+    if (!video) {
+      throw new ApiError(404, "Video not found");
+    }
+
+    const hls = video.hls;
+
+    if (
+      !hls ||
+      !hls.masterUrl ||
+      !hls.resolutions ||
+      Object.keys(hls.resolutions).length === 0
+    ) {
+      throw new ApiError(404, "Video metaData not found");
+    } else {
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            hls,
+            "Hls Video Streaming data successfully fetched"
+          )
+        );
+    }
+  } catch (error) {
+    console.error(error);
+    throw new ApiError(
+      500,
+      "Internal server error in streaming the hls video",
+      error
+    );
+  }
+});
+
+const progressiveStream = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  if (!videoId || !isValidObjectId(videoId)) {
+    throw new ApiError(
+      400,
+      "Video ID is required and must be a valid ObjectId"
+    );
+  }
+
+  try {
+    const video = await Video.findById(videoId).lean();
+    if (!video) {
+      throw new ApiError(404, "Video not found");
+    }
+
+    const videoFile = video.videoFile;
+
+    if (!videoFile) {
+      throw new ApiError(404, "Video File not found");
+    } else {
+      return res
+        .status(200)
+        .json(new ApiResponse(200, videoFile, "Video Fetched SuccessFully"));
+    }
+  } catch (error) {
+    console.error(error);
+    throw new ApiError(500, "Internal server error", error);
+  }
+});
+
 export {
   getAllPublishedVideos,
   deleteVideo,
@@ -509,4 +611,6 @@ export {
   togglePublishStatus,
   updateVideo,
   getAllOwnVideos,
+  adaptiveStream,
+  progressiveStream,
 };

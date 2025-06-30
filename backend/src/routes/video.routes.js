@@ -1,44 +1,49 @@
-import { Router } from 'express';
+import { Router } from "express";
 import {
-     getAllPublishedVideos,
-    deleteVideo,
-    getVideoById,
-    publishAVideo,
-    togglePublishStatus,
-    updateVideo,
-    getAllOwnVideos
-} from "../controllers/video.conrollers.js"
-import {verifyJwt} from "../middlewares/auth.middlewares.js"
-import {upload} from "../middlewares/multer.middlewares.js"
+  getAllPublishedVideos,
+  deleteVideo,
+  getVideoById,
+  publishAVideo,
+  togglePublishStatus,
+  updateVideo,
+  getAllOwnVideos,
+  progressiveStream,
+  adaptiveStream,
+} from "../controllers/video.controller.js";
+import { verifyJwt } from "../middlewares/auth.middlewares.js";
+import { upload } from "../middlewares/multer.middlewares.js";
 
 const router = Router();
-router.use(verifyJwt); 
+
+router.route("/published").get(getAllPublishedVideos);
 
 router
-    .route("/")
-    .get(getAllOwnVideos)
-    .post(
-        upload.fields([
-            {
-                name: "videoFile",
-                maxCount: 1,
-            },
-            {
-                name: "thumbnail",
-                maxCount: 1,
-            },
-            
-        ]),
-        publishAVideo
-    );
-router.route('/published').get(getAllPublishedVideos);
+  .route("/")
+  .get(verifyJwt, getAllOwnVideos)
+  .post(
+    verifyJwt,
+    upload.fields([
+      {
+        name: "videoFile",
+        maxCount: 1,
+      },
+      {
+        name: "thumbnail",
+        maxCount: 1,
+      },
+    ]),
+    publishAVideo
+  );
 
 router
-    .route("/:videoId")
-    .get(getVideoById)
-    .delete(deleteVideo)
-    .patch(upload.single("thumbnail"), updateVideo);
+  .route("/:videoId")
+  .get(verifyJwt, getVideoById)
+  .delete(verifyJwt, deleteVideo)
+  .patch(verifyJwt, upload.single("thumbnail"), updateVideo);
 
-router.route("/toggle/publish/:videoId").patch(togglePublishStatus);
+router.route("/stream/:videoId/progressive").get(progressiveStream);
+router.route("/stream/:videoId/adaptive").get(adaptiveStream);
 
-export default router
+router.route("/toggle/publish/:videoId").patch(verifyJwt, togglePublishStatus);
+
+export default router;
