@@ -3,4 +3,4 @@ import IORedis from "ioredis";
 
 const connection = new IORedis();
 
-export const videoQueue = new Queue("video-transcode", { connection });
+export const videoHlsformation = new Queue("video-hls-conversion", { connection });
